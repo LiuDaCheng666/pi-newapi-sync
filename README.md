@@ -8,19 +8,32 @@
 
 [pi](https://pi.dev) 编码智能体的插件：自动把 **New API / One API** 网关的模型清单和真实限额同步进 pi，不再手工维护 `models.json`，也不再受 pi 默认猜测值（128K 上下文 / 16K 输出）的困扰。
 
+## 30 秒快速上手
+
+**已有网关**（models.json 里配过 New API 供应商，例如用 Claude Code 时）：
+
+```bash
+pi install git:github.com/LiuDaCheng666/pi-newapi-sync@v0.1.1
+```
+
+重启 pi。结束——配置文件自动生成，模型限额自动同步。
+
+**还没有网关**：装完后在 pi 里运行 `/newapi-setup`，按提示粘贴网关地址和 API Key 即可。
+
+----
+
 - ✅ 自动发现：扫描你的 `models.json` 找到 New API 网关，拉取 `/v1/models` + `/api/pricing`
+- ✅ 零配置：首次运行自动生成配置文件；`/newapi-setup` 交互式接入新网关
 - ✅ 真实限额：`contextWindow` / `maxTokens` 与网关配置实时同步（如 1M 上下文 / 32K 输出）
 - ✅ 聚合供应商：注册 `newapi` provider，一处浏览网关全部模型
-- ✅ 覆写已有供应商：models.json 里手工配置的供应商（如 `new-provider`）被网关真实数据覆写（apiKey/baseUrl 仍由你的 models.json 提供）
+- ✅ 覆写已有供应商：models.json 里手工配置的供应商被网关真实数据覆写（apiKey/baseUrl 仍由你的 models.json 提供）
 - ✅ `/probe-models`：实测每个模型的真实 max_tokens 上限和图片支持（网关元数据通常不含能力标记）
 - ✅ 断网降级：拉取失败自动使用上次缓存，不阻塞启动
 
 ## 安装
 
 ```bash
-pi install npm:pi-newapi-sync
-# 或从 GitHub：
-pi install git:github.com/<你的用户名>/pi-newapi-sync@v0.1.0
+pi install git:github.com/LiuDaCheng666/pi-newapi-sync@v0.1.1
 ```
 
 装完重启 pi 即生效。启动日志可见：
@@ -28,6 +41,8 @@ pi install git:github.com/<你的用户名>/pi-newapi-sync@v0.1.0
 ```
 [newapi-sync] 就绪: 10 模型, 覆写: new-provider, new-provider-12
 ```
+
+如果 models.json 里还没有网关供应商，在 pi 里运行 `/newapi-setup`，按提示粘贴地址和 key，自动完成接入。
 
 ## 配置
 
