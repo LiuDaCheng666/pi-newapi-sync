@@ -311,6 +311,28 @@ export default async function (pi: ExtensionAPI) {
 
     if (fetched.size > 0 || Object.keys(byGateway).length > 0) writeCache(cache);
 
+    // ---- 零配置体验：没有配置文件时，自动生成 ----
+    // 把发现的网关供应商全部写进 overwriteProviders，用户装完即用，不用手写任何配置。
+    // 只有用户后来手写的 modelOverrides 等高级选项才需要再碰配置文件。
+    const configPath = findConfigFile(cwd) ?? join(homeDir(), ".pi", "agent", CONFIG_FILE);
+    if (!existsSync(configPath) && gateways.size > 0) {
+      const autoProviders = [...Object.entries(providers)]
+        .filter(([, pcfg]) => pcfg?.baseUrl && normalizeGatewayBase(pcfg.baseUrl) in byGateway)
+        .map(([pid]) => pid);
+      if (autoProviders.length > 0) {
+        try {
+          const autoCfg: PackageConfig = { overwriteProviders: autoProviders };
+          writeFileSync(configPath, JSON.stringify(autoCfg, null, 2));
+          console.error(
+            `${LOG_PREFIX} 未找到配置，已自动生成 ${configPath}（覆写: ${autoProviders.join(", ")}）`,
+          );
+          cfg.overwriteProviders = autoProviders;
+        } catch (e) {
+          console.error(`${LOG_PREFIX} 自动生成配置失败：${e instanceof Error ? e.message : e}`);
+        }
+      }
+    }
+
     const overwrite = cfg.overwriteProviders ?? [];
 
     // ---- 覆写 models.json 供应商（运行时注册）----
