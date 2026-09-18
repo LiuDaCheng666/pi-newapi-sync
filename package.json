@@ -1,6 +1,6 @@
 {
   "name": "pi-newapi-sync",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Auto-sync New API gateway models and limits (context window, max output, vision) into pi coding agent. Overwrites manually-configured providers with gateway-accurate limits, registers an aggregated provider, and ships /probe-models for empirical capability testing.",
   "keywords": [
     "pi-package",

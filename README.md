@@ -59,7 +59,7 @@ pi install git:github.com/LiuDaCheng666/pi-newapi-sync@v0.1.1
     "some-model": { "contextWindow": 1000000, "maxTokens": 32768 }
   },
   "providerName": "newapi",     // 聚合 provider 名称，设为 "" 不注册
-  "markImage": true,            // 标注图片输入能力（New API 元数据不含此信息，按部署实际改）
+  "markImage": false,           // 未实测模型的图片标注（默认 false=不标注；实测结果优先于此配置）
   "markReasoning": true,        // 按命名启发式标注思考模型
   "timeoutMs": 15000,           // 启动同步超时
   "api": "anthropic-messages",  // 网关 API 类型
@@ -117,7 +117,7 @@ pi install git:github.com/LiuDaCheng666/pi-newapi-sync@v0.1.1
 
 - **网关未配 pricing 的模型**：限额走兜底值。New API 管理员可以在后台给每个模型配 `context_length` / `max_output_tokens`；配了就自动准确
 - **max_tokens 探测不是万能的**：部分上游对超大值宽松接受（不报错），此时探测不出数字上限（结果标 `accepted`）
-- **图片能力无元数据**：New API 不暴露视觉能力字段，默认全标支持；你的部署如有纯文本模型，用 `markImage: false` 或改用模型级配置
+- **图片能力靠探测**：New API 不暴露视觉能力字段，未实测的模型默认**不标注**图片（保守策略，不假装知道）；跑一次 `/probe-models` 即得到实测标注。想让未实测模型也默认标注，设 `markImage: true`
 - **模型路由**：网关可能把请求路由到别的模型（响应 `model` 字段不一致），探测结果会标注 `routedTo`
 
 ## 已验证
@@ -165,7 +165,7 @@ Zero-config by default. To enable overwriting, create `.pi/newapi-sync.json` (pr
 {
   "overwriteProviders": ["new-provider", "new-provider-*"],
   "providerName": "newapi",
-  "markImage": true,
+  "markImage": false,
   "markReasoning": true,
   "timeoutMs": 8000,
   "extraGateways": []

@@ -31,7 +31,8 @@ export interface PackageConfig {
   modelOverrides?: Record<string, { contextWindow?: number; maxTokens?: number; reasoning?: boolean }>;
   /** 聚合 provider 的名称，默认 "newapi"；设为 "" 不注册聚合 provider */
   providerName?: string;
-  /** 标注图片输入能力，默认 true */
+  /** 未实测模型的图片标注（仅当探测缓存无该模型结果时生效）。默认 false：
+   *  不实测就不标注——"声明支持"应该是探测的结果，不是拍脑袋的默认值 */
   markImage?: boolean;
   /** 按命名启发式标注思考模型，默认 true */
   markReasoning?: boolean;
@@ -57,7 +58,7 @@ const REASONING_PATTERNS = [
 
 const DEFAULTS = {
   providerName: "newapi",
-  markImage: true,
+  markImage: false,
   markReasoning: true,
   timeoutMs: 15000,
   api: "anthropic-messages",
