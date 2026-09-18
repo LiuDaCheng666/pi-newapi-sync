@@ -13,6 +13,19 @@
     "llm"
   ],
   "license": "MIT",
+  "author": {
+    "name": "liudacheng",
+    "email": "1224227487@qq.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/liudacheng/pi-newapi-sync.git"
+  },
+  "homepage": "https://github.com/liudacheng/pi-newapi-sync#readme",
+  "bugs": "https://github.com/liudacheng/pi-newapi-sync/issues",
+  "engines": {
+    "node": ">=20"
+  },
   "type": "module",
   "pi": {
     "extensions": ["./extensions"],

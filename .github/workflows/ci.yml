@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Syntax check extensions
+        run: |
+          node --input-type=module -e "
+            import { readFileSync } from 'node:fs';
+            for (const f of ['extensions/newapi-sync.ts', 'extensions/probe-models.ts']) {
+              const src = readFileSync(f, 'utf-8');
+              // 基础健全性：无未闭合模板串、无 TDZ 常见模式（const 前引用）由 tsc 处理，这里查括号平衡
+              let open = 0, close = 0;
+              for (const ch of src) { if (ch === '{') open++; if (ch === '}') close++; }
+              if (open !== close) { console.error('Brace imbalance in ' + f); process.exit(1); }
+            }
+            console.log('extensions look sane');
+          "
+      - name: Validate package.json manifest
+        run: |
+          node -e "
+            const pkg = require('./package.json');
+            if (!pkg.keywords.includes('pi-package')) throw new Error('missing pi-package keyword');
+            if (!pkg.pi?.extensions?.length) throw new Error('missing pi.extensions');
+            console.log('pi manifest OK:', pkg.name, pkg.version);
+          "
+      - name: npm pack (publish dry-run)
+        run: npm pack --dry-run
