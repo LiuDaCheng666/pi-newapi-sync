@@ -189,7 +189,7 @@ export interface SyncedModel {
 }
 
 /** 探测缓存：/probe-models 实测的 max_tokens 上限（pricing 缺失时的补充来源） */
-function loadProbeLimits(): Record<string, { maxTokens?: number }> {
+function loadProbeLimits(): Record<string, { maxTokens?: number; image?: "yes" | "no" | "error"; reasoning?: boolean }> {
   try {
     return JSON.parse(readFileSync(join(homeDir(), ".pi", "agent", "newapi-sync-probe.json"), "utf-8"));
   } catch {
@@ -273,10 +273,13 @@ export default async function (pi: ExtensionAPI) {
               : probe?.image === "no"
                 ? false
                 : cfg.markImage !== false;
+            // 思考能力：实测（自发 thinking 块）> 启发式
+            const reasoning =
+              manual?.reasoning ?? probe?.reasoning ?? isReasoningModel(m.id, cfg.markReasoning !== false);
             return {
               id: m.id,
               name: m.id,
-              reasoning: manual?.reasoning ?? isReasoningModel(m.id, cfg.markReasoning !== false),
+              reasoning,
               input: (imageInput ? ["text", "image"] : ["text"]) as ("text" | "image")[],
               cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
               // 限额优先级：手工覆写 > 网关 pricing > 探测缓存 > pi 一致兜底
@@ -291,6 +294,7 @@ export default async function (pi: ExtensionAPI) {
         byGateway[base] = models;
         cache[base] = { models, at: Date.now() };
         fetched.add(base);
+        if (!_firstBase) { _firstBase = base; _firstKey = key; }
 
         for (const m of models) {
           if (!seen.has(m.id)) {
@@ -404,7 +408,81 @@ export default async function (pi: ExtensionAPI) {
     if (overwritten.length > 0) parts.push(`覆写: ${overwritten.join(", ")}`);
     else if (overwrite.length > 0) parts.push("覆写目标无匹配（检查 overwriteProviders 与 baseUrl）");
     console.error(`${LOG_PREFIX} 就绪: ${parts.join(", ")}`);
+
+    // ---- 后台能力实测（不阻塞启动）----
+    // 对探测缓存里没有 reasoning 实测记录的模型，异步发一条消息检查是否自发输出 thinking 块。
+    // 结果写入探测缓存，下次启动生效。失败静默——这只是增强，不是关键路径。
+    void backgroundProbe(base_first(), aggregated, key_first(), cacheFile);
   } finally {
     clearTimeout(timer);
+  }
+}
+
+/** 第一个成功网关的 baseUrl（供后台探测用） */
+let _firstBase: string | undefined;
+let _firstKey: string | undefined;
+function base_first(): string | undefined { return _firstBase; }
+function key_first(): string | undefined { return _firstKey; }
+
+/**
+ * 后台逐模型实测：是否自发输出 thinking 块（推理能力的行为证据）。
+ * 每模型 1 条请求，max_tokens 500，成本可忽略。全串行、限速 250ms，避免触发网关限流。
+ */
+async function backgroundProbe(
+  base: string | undefined,
+  models: SyncedModel[],
+  apiKey: string | undefined,
+  cacheFile: string,
+): Promise<void> {
+  if (!base || models.length === 0) return;
+  // 只测缓存里没有 reasoning 记录的模型
+  let probeData: Record<string, any> = {};
+  try {
+    probeData = JSON.parse(readFileSync(join(homeDir(), ".pi", "agent", "newapi-sync-probe.json"), "utf-8"));
+  } catch { /* 首次 */ }
+  const todo = models.filter((m) => probeData[m.id]?.reasoning === undefined);
+  if (todo.length === 0) return;
+
+  console.error(`${LOG_PREFIX} 后台实测思考能力: ${todo.length} 个模型（结果下次启动生效）`);
+  const headers: Record<string, string> = { "content-type": "application/json" };
+  if (apiKey) {
+    headers["x-api-key"] = apiKey;
+    headers["anthropic-version"] = "2023-06-01";
+  }
+  let updated = false;
+  for (const m of todo) {
+    try {
+      const res = await fetch(`${base}/v1/messages`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          model: m.id,
+          max_tokens: 500,
+          messages: [{
+            role: "user",
+            content: "Solve step by step: If 3 machines make 3 widgets in 3 minutes, how long do 100 machines need for 100 widgets?",
+          }],
+        }),
+      });
+      const body = (await res.json()) as any;
+      if (body.error) {
+        // 报错不代表不支持思考，跳过不记录
+        continue;
+      }
+      const hasThinking = (body.content ?? []).some(
+        (b: any) => b.type === "thinking" || (b.thinking && b.type !== "text"),
+      );
+      probeData[m.id] = { ...probeData[m.id], reasoning: hasThinking, gateway: base, at: Date.now() };
+      updated = true;
+    } catch {
+      // 网络问题不记录
+    }
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  if (updated) {
+    try {
+      writeFileSync(join(homeDir(), ".pi", "agent", "newapi-sync-probe.json"), JSON.stringify(probeData, null, 2));
+      console.error(`${LOG_PREFIX} 思考能力实测完成，已写入探测缓存`);
+    } catch { /* 写失败无所谓 */ }
   }
 }
