@@ -1,3 +1,4 @@
 node_modules/
 probe-results.json
 *.log
+.pi/
