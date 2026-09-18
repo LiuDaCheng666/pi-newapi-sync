@@ -205,10 +205,12 @@ export default function (pi: ExtensionAPI) {
         /* 输出失败不致命 */
       }
 
-      // 探测缓存回写（主扩展在 pricing 缺限额时用作兜底）
+      // 探测缓存回写（主扩展在 pricing 缺限额/无能力元数据时用作兜底）
       try {
         const probeFile = join(home, ".pi", "agent", "newapi-sync-probe.json");
-        let merged: Record<string, { maxTokens?: number; gateway?: string; at: number }> = {};
+        let merged: Record<string, {
+          maxTokens?: number; image?: "yes" | "no" | "error"; gateway?: string; at: number;
+        }> = {};
         try {
           merged = JSON.parse(readFileSync(probeFile, "utf-8"));
         } catch {
@@ -217,6 +219,7 @@ export default function (pi: ExtensionAPI) {
         for (const r of results) {
           merged[r.model] = {
             ...(r.maxTokensLimit ? { maxTokens: r.maxTokensLimit } : {}),
+            ...(r.image !== "error" ? { image: r.image } : {}),
             gateway: gw,
             at: Date.now(),
           };

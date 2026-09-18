@@ -265,16 +265,23 @@ export default async function (pi: ExtensionAPI) {
           .map((m) => {
             const p = pricing[m.id];
             const manual = cfg.modelOverrides?.[m.id];
+            const probe = probeLimits[m.id];
+            // 图片支持：实测结果 > 全局标注配置（网关元数据无此字段，未实测时只能按配置标注）
+            const imageInput = probe?.image === "yes"
+              ? true
+              : probe?.image === "no"
+                ? false
+                : cfg.markImage !== false;
             return {
               id: m.id,
               name: m.id,
               reasoning: manual?.reasoning ?? isReasoningModel(m.id, cfg.markReasoning !== false),
-              input: (cfg.markImage === false ? ["text"] : ["text", "image"]) as ("text" | "image")[],
+              input: (imageInput ? ["text", "image"] : ["text"]) as ("text" | "image")[],
               cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
               // 限额优先级：手工覆写 > 网关 pricing > 探测缓存 > pi 一致兜底
               // 必须始终给值：pi --list-models 对 undefined 会崩（formatTokenCount）
               contextWindow: manual?.contextWindow ?? p?.context_length ?? FALLBACK_CONTEXT,
-              maxTokens: manual?.maxTokens ?? p?.max_output_tokens ?? probeLimits[m.id]?.maxTokens ?? FALLBACK_MAX_TOKENS,
+              maxTokens: manual?.maxTokens ?? p?.max_output_tokens ?? probe?.maxTokens ?? FALLBACK_MAX_TOKENS,
             };
           });
 
